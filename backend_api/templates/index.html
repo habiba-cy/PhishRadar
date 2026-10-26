@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhishRadar — URL Threat Detector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── DESIGN TOKENS ───────────────────────────── */
+    :root {
+      --bg:          #09090f;
+      --bg-card:     #0f0f1a;
+      --bg-input:    #13131f;
+      --border:      rgba(255,255,255,0.07);
+      --border-glow: rgba(99,102,241,0.5);
+      --text:        #e8e8f0;
+      --text-muted:  #6b6b85;
+      --text-dim:    #3a3a52;
+      --accent:      #6366f1;
+      --accent-lite: #818cf8;
+      --safe:        #10b981;
+      --safe-bg:     rgba(16,185,129,0.08);
+      --safe-border: rgba(16,185,129,0.25);
+      --warn:        #f59e0b;
+      --warn-bg:     rgba(245,158,11,0.08);
+      --warn-border: rgba(245,158,11,0.25);
+      --danger:      #ef4444;
+      --danger-bg:   rgba(239,68,68,0.08);
+      --danger-border: rgba(239,68,68,0.25);
+      --radius:      14px;
+      --mono:        'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.15;
+    }
+    .orb-1 { width: 500px; height: 500px; background: #6366f1; top: -200px; left: -100px; }
+    .orb-2 { width: 400px; height: 400px; background: #06b6d4; bottom: -150px; right: -100px; }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      text-align: center;
+      margin-bottom: 56px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .logo-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px; height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent), #06b6d4);
+      margin-bottom: 24px;
+      box-shadow: 0 0 40px rgba(99,102,241,0.35);
+    }
+    .logo-mark svg { width: 32px; height: 32px; }
+    .header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #e8e8f0 0%, var(--accent-lite) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+    .header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+      max-width: 420px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .badge-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: var(--bg-card);
+    }
+
+    /* ── SEARCH CARD ── */
+    .search-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s 0.1s ease both;
+      position: relative;
+      overflow: hidden;
+    }
+    .search-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+    .input-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .input-group {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .url-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      min-width: 0;
+    }
+    .url-input::placeholder { color: var(--text-dim); }
+    .url-input:focus {
+      border-color: var(--border-glow);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+    .scan-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 14px 28px;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      white-space: nowrap;
+      position: relative;
+      overflow: hidden;
+    }
+    .scan-btn:hover {
+      background: var(--accent-lite);
+      box-shadow: 0 0 24px rgba(99,102,241,0.4);
+    }
+    .scan-btn:active { transform: scale(0.97); }
+    .scan-btn.loading { pointer-events: none; }
+    .scan-btn.loading .btn-text { opacity: 0; }
+    .scan-btn .spinner {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .scan-btn.loading .spinner { display: flex; }
+    .spinner svg { animation: spin 0.8s linear infinite; width: 20px; height: 20px; }
+
+    /* ── ERROR ── */
+    .error-box {
+      background: rgba(239,68,68,0.07);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: #fca5a5;
+      animation: fadeUp 0.3s ease both;
+    }
+    .error-box svg { flex-shrink: 0; }
+
+    /* ── RESULT CARD ── */
+    .result-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+    }
+    .result-card.safe   { border-top: 3px solid var(--safe); }
+    .result-card.medium { border-top: 3px solid var(--warn); }
+    .result-card.high   { border-top: 3px solid var(--danger); }
+
+    /* ── VERDICT HEADER ── */
+    .verdict-header {
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .verdict-icon {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .verdict-icon svg { width: 28px; height: 28px; }
+    .safe   .verdict-icon { background: var(--safe-bg);   color: var(--safe); }
+    .medium .verdict-icon { background: var(--warn-bg);   color: var(--warn); }
+    .high   .verdict-icon { background: var(--danger-bg); color: var(--danger); }
+
+    .verdict-text { flex: 1; min-width: 180px; }
+    .verdict-label {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .safe   .verdict-label { color: var(--safe); }
+    .medium .verdict-label { color: var(--warn); }
+    .high   .verdict-label { color: var(--danger); }
+    .verdict-url {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+      word-break: break-all;
+    }
+
+    /* ── SCORE RING (replaces plain number) ── */
+    .score-block {
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .score-ring-svg { display: block; margin: 0 auto; }
+    .score-ring-track { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 6; }
+    .score-ring-fill  {
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+      transition: stroke-dashoffset 1s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .safe   .score-ring-fill { stroke: var(--safe); }
+    .medium .score-ring-fill { stroke: var(--warn); }
+    .high   .score-ring-fill { stroke: var(--danger); }
+    .score-ring-num {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 500;
+      dominant-baseline: central;
+      text-anchor: middle;
+    }
+    .safe   .score-ring-num { fill: var(--safe); }
+    .medium .score-ring-num { fill: var(--warn); }
+    .high   .score-ring-num { fill: var(--danger); }
+    .score-ring-pct {
+      font-family: var(--mono);
+      font-size: 10px;
+      dominant-baseline: central;
+      text-anchor: middle;
+      fill: var(--text-muted);
+    }
+    .score-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .score-bar-wrap { padding: 0 32px 24px; }
+    .score-bar-track {
+      height: 6px;
+      background: var(--bg-input);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .safe   .score-bar-fill { background: var(--safe); }
+    .medium .score-bar-fill { background: var(--warn); }
+    .high   .score-bar-fill { background: var(--danger); }
+
+    .divider { height: 1px; background: var(--border); margin: 0 32px; }
+
+    .section { padding: 24px 32px; }
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── REASONS — coloured by risk level ── */
+    .reason-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .reason-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      border: 1px solid transparent;
+    }
+    .safe   .reason-item { background: var(--safe-bg);   border-color: rgba(16,185,129,0.15); color: #a7f3d0; }
+    .medium .reason-item { background: var(--warn-bg);   border-color: rgba(245,158,11,0.15);  color: #fde68a; }
+    .high   .reason-item { background: var(--danger-bg); border-color: rgba(239,68,68,0.15);   color: #fca5a5; }
+    .reason-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      margin-top: 6px; flex-shrink: 0;
+    }
+    .safe   .reason-dot { background: var(--safe); }
+    .medium .reason-dot { background: var(--warn); }
+    .high   .reason-dot { background: var(--danger); }
+
+    /* ── RECOMMENDED ACTIONS ── */
+    .action-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .action-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .action-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      margin-top: 6px; flex-shrink: 0;
+    }
+    .safe   .action-dot { background: var(--safe); }
+    .medium .action-dot { background: var(--warn); }
+    .high   .action-dot { background: var(--danger); }
+
+    /* ── INTEL CARDS (VirusTotal / GSB) ── */
+    .intel-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .intel-card {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* coloured bottom accent line */
+    .intel-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .intel-card.intel-clean   { border-color: var(--safe-border); }
+    .intel-card.intel-clean::after   { background: var(--safe);   opacity: 0.5; }
+    .intel-card.intel-flagged { border-color: var(--danger-border); }
+    .intel-card.intel-flagged::after { background: var(--danger); opacity: 0.7; }
+    .intel-card.intel-pending::after { background: var(--text-dim); opacity: 0.4; }
+
+    .intel-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    .intel-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    }
+    .intel-clean   .intel-dot { background: var(--safe); }
+    .intel-flagged .intel-dot { background: var(--danger); }
+    .intel-pending .intel-dot { background: var(--text-dim); }
+    .intel-name {
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .intel-status {
+      font-family: var(--mono);
+      font-size: 0.84rem;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .intel-clean   .intel-status { color: var(--safe); }
+    .intel-flagged .intel-status { color: var(--danger); }
+    .intel-pending .intel-status { color: var(--text-dim); }
+    .intel-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* ── TECHNICAL CHECKS GRID ── */
+    .checks-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 560px) { .checks-grid { grid-template-columns: 1fr; } }
+
+    .check-card {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      /* coloured left accent border */
+      border-left-width: 3px;
+      transition: border-color 0.2s;
+    }
+    .check-card.check-ok     { border-left-color: var(--safe);    background: rgba(16,185,129,0.04); }
+    .check-card.check-warn   { border-left-color: var(--warn);    background: rgba(245,158,11,0.04); }
+    .check-card.check-bad    { border-left-color: var(--danger);  background: rgba(239,68,68,0.04);  }
+    .check-card.check-neutral{ border-left-color: var(--text-dim); }
+
+    .check-icon-wrap {
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .check-body { flex: 1; min-width: 0; }
+    .check-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+    .check-value {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .check-ok     .check-value { color: var(--safe); }
+    .check-warn   .check-value { color: var(--warn); }
+    .check-bad    .check-value { color: var(--danger); }
+    .check-neutral .check-value { color: var(--text-muted); }
+
+    .check-badge {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 100px;
+      align-self: flex-start;
+      margin-top: 1px;
+      white-space: nowrap;
+    }
+    .check-ok     .check-badge { background: var(--safe-bg);   color: var(--safe);   border: 1px solid var(--safe-border); }
+    .check-warn   .check-badge { background: var(--warn-bg);   color: var(--warn);   border: 1px solid var(--warn-border); }
+    .check-bad    .check-badge { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+    .check-neutral .check-badge { background: rgba(255,255,255,0.04); color: var(--text-dim); border: 1px solid var(--border); }
+
+    /* ── PAGE ANALYSIS TABLE ── */
+    .page-analysis-table {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .pa-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s;
+    }
+    .pa-row:last-child { border-bottom: none; }
+    .pa-row:hover { background: rgba(255,255,255,0.02); }
+    .pa-icon { font-size: 15px; flex-shrink: 0; width: 22px; text-align: center; }
+    .pa-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      flex: 1;
+    }
+    .pa-value {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 500;
+      text-align: right;
+    }
+    .pa-value.ok  { color: var(--safe); }
+    .pa-value.bad { color: var(--danger); }
+    .pa-value.warn { color: var(--warn); }
+    .pa-value.neutral { color: var(--text-muted); }
+
+    /* ── CACHE NOTE ── */
+    .cache-note {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      padding: 16px 32px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── HOW IT WORKS ── */
+    .how-section {
+      margin-top: 40px;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .how-title {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 560px) { .how-grid { grid-template-columns: 1fr; } }
+    .how-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .how-num {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .how-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+    .how-card p  { font-size: 0.8rem; color: var(--text-muted); line-height: 1.55; }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center;
+      margin-top: 60px;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+      .wrapper { padding: 40px 16px 60px; }
+      .verdict-header { padding: 20px; }
+      .section { padding: 20px; }
+      .input-group { flex-direction: column; }
+      .scan-btn { width: 100%; }
+      .score-block { text-align: center; }
+      .intel-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="wrapper">
+
+    <!-- ── HEADER ── -->
+    <header class="header">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <h1>PhishRadar</h1>
+      <p>Real-time phishing URL detection powered by XGBoost and Explainable AI</p>
+      <div class="badge-row">
+        <span class="badge">87 features analysed</span>
+        <span class="badge">XGBoost · ~97% accuracy</span>
+        <span class="badge">XAI explanations</span>
+        <span class="badge">VirusTotal · Google Safe Browsing</span>
+        <span class="badge">Cached results</span>
+      </div>
+    </header>
+
+    <!-- ── SEARCH CARD ── -->
+    <div class="search-card">
+      <label class="input-label" for="url-field">Enter a URL to scan</label>
+      <form method="POST" action="/" id="scan-form">
+        <div class="input-group">
+          <input
+            class="url-input"
+            type="text"
+            id="url-field"
+            name="url"
+            placeholder="https://example.com/path?query=value"
+            value="{{ result.url_display if result and result.url_display else '' }}"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="scan-btn" type="submit" id="scan-btn">
+            <span class="btn-text">Scan URL</span>
+            <span class="spinner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+      </form>
+
+      {% if result and result.error %}
+      <div class="error-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        {{ result.error }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── RESULT CARD ── -->
+    {% if result and result.risk_level %}
+    <div class="result-card {{ result.risk_level }}">
+
+      <!-- Verdict header -->
+      <div class="verdict-header">
+        <div class="verdict-icon">
+          {% if result.risk_level == 'safe' %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          {% elif result.risk_level == 'medium' %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          {% else %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {% endif %}
+        </div>
+
+        <div class="verdict-text">
+          <div class="verdict-label">{{ result.risk_label }}</div>
+          <div class="verdict-url">{{ result.url_display }}</div>
+        </div>
+
+        <!-- ── SCORE RING ── -->
+        <div class="score-block">
+          {% set score_pct = (result.score * 100) | round | int %}
+          {% set circumference = 163.4 %}
+          {% set offset = circumference - (circumference * score_pct / 100) %}
+          <svg class="score-ring-svg" width="72" height="72" viewBox="0 0 72 72">
+            <circle class="score-ring-track" cx="36" cy="36" r="26"/>
+            <circle class="score-ring-fill"
+              cx="36" cy="36" r="26"
+              stroke-dasharray="{{ circumference }}"
+              stroke-dashoffset="{{ offset }}"
+              data-target-offset="{{ offset }}"
+            />
+            <text class="score-ring-num" x="36" y="34">{{ score_pct }}</text>
+            <text class="score-ring-pct" x="36" y="47">%</text>
+          </svg>
+          <div class="score-label">Phishing score</div>
+        </div>
+      </div>
+
+      <!-- Score bar -->
+      <div class="score-bar-wrap">
+        <div class="score-bar-track">
+          <div class="score-bar-fill" data-score="{{ "%.1f"|format(result.score * 100) }}"></div>
+        </div>
+      </div>
+
+      <!-- Explanations -->
+      <div class="divider"></div>
+      <div class="section">
+        <div class="section-title">Why this verdict?</div>
+        <ul class="reason-list">
+          {% for reason in result.explanations %}
+          <li class="reason-item">
+            <span class="reason-dot"></span>
+            {{ reason }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Recommended actions -->
+      {% if result.recommended_actions %}
+      <div class="divider"></div>
+      <div class="section">
+        <div class="section-title">Recommended Actions</div>
+        <ul class="action-list">
+          {% for action in result.recommended_actions %}
+          <li class="action-item">
+            <span class="action-dot"></span>
+            {{ action }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <!-- ── EXTERNAL THREAT INTELLIGENCE ── -->
+      <div class="divider"></div>
+      <div class="section">
+        <div class="section-title">External threat intelligence</div>
+        <div class="intel-grid">
+
+          <!-- VirusTotal -->
+          <div class="intel-card
+            {% if result.external.virustotal %}
+              {% if result.external.virustotal.malicious > 0 %}intel-flagged{% else %}intel-clean{% endif %}
+            {% else %}intel-pending{% endif %}">
+            <div class="intel-logo-row">
+              <span class="intel-dot"></span>
+              <span class="intel-name">VirusTotal</span>
+            </div>
+            {% if result.external.virustotal %}
+              {% if result.external.virustotal.malicious > 0 %}
+                <div class="intel-status">{{ result.external.virustotal.malicious }}/{{ result.external.virustotal.total }} vendors flagged</div>
+                <div class="intel-sub">{{ result.external.virustotal.harmless }} confirmed safe</div>
+              {% else %}
+                <div class="intel-status">Clean — {{ result.external.virustotal.harmless }} safe</div>
+                <div class="intel-sub">{{ result.external.virustotal.total }} vendors checked</div>
+              {% endif %}
+            {% else %}
+              <div class="intel-status">Checking…</div>
+            {% endif %}
+          </div>
+
+          <!-- Google Safe Browsing -->
+          <div class="intel-card
+            {% if result.external.google_safe_browsing %}
+              {% if result.external.google_safe_browsing.threat %}intel-flagged{% else %}intel-clean{% endif %}
+            {% else %}intel-pending{% endif %}">
+            <div class="intel-logo-row">
+              <span class="intel-dot"></span>
+              <span class="intel-name">Google Safe Browsing</span>
+            </div>
+            {% if result.external.google_safe_browsing %}
+              {% if result.external.google_safe_browsing.threat %}
+                <div class="intel-status">{{ result.external.google_safe_browsing.threat | replace("_", " ") | title }}</div>
+                <div class="intel-sub">Threat detected</div>
+              {% else %}
+                <div class="intel-status">No threats found</div>
+                <div class="intel-sub">All categories clear</div>
+              {% endif %}
+            {% else %}
+              <div class="intel-status">Checking…</div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── TECHNICAL CHECKS ── -->
+      <div class="divider"></div>
+      <div class="section">
+        <div class="section-title">Technical checks</div>
+        <div class="checks-grid">
+
+          <!-- Hostname -->
+          <div class="check-card {% if result.technical_checks.hostname %}check-ok{% else %}check-neutral{% endif %}">
+            <div class="check-icon-wrap">🌐</div>
+            <div class="check-body">
+              <div class="check-label">Hostname</div>
+              <div class="check-value">
+                {{ result.technical_checks.hostname | truncate(30, True, '…') }}
+              </div>
+            </div>
+            <div class="check-badge">
+              {% if result.technical_checks.hostname %}OK{% else %}—{% endif %}
+            </div>
+          </div>
+
+          <!-- DNS Record -->
+          <div class="check-card {% if result.technical_checks.dns_record %}check-ok{% else %}check-bad{% endif %}">
+            <div class="check-icon-wrap">📡</div>
+            <div class="check-body">
+              <div class="check-label">DNS Record</div>
+              <div class="check-value">
+                {% if result.technical_checks.dns_record %}Record found{% else %}No DNS record{% endif %}
+              </div>
+            </div>
+            <div class="check-badge">
+              {% if result.technical_checks.dns_record %}OK{% else %}NONE{% endif %}
+            </div>
+          </div>
+
+          <!-- WHOIS -->
+          <div class="check-card {% if result.technical_checks.whois_registered %}check-warn{% else %}check-bad{% endif %}">
+            <div class="check-icon-wrap">📋</div>
+            <div class="check-body">
+              <div class="check-label">WHOIS Data</div>
+              <div class="check-value">
+                {% if result.technical_checks.whois_registered %}Registered{% else %}Not available{% endif %}
+              </div>
+              <div class="check-value" style="margin-top:3px; font-size:0.72rem; opacity:0.7;">
+                Domain age: {{ result.technical_checks.domain_age_days }} days
+              </div>
+              <div class="check-value" style="margin-top:3px; font-size:0.72rem; opacity:0.7;">
+                Registration length: {{ result.technical_checks.registration_length_days }} days
+              </div>
+            </div>
+            <div class="check-badge">
+              {% if result.technical_checks.whois_registered %}WARN{% else %}NONE{% endif %}
+            </div>
+          </div>
+
+          <!-- SSL Certificate -->
+          <div class="check-card
+            {% if result.technical_checks.ssl.status == 'valid' %}check-ok
+            {% elif result.url_display.startswith('https') %}check-warn
+            {% else %}check-bad{% endif %}">
+            <div class="check-icon-wrap">🔒</div>
+            <div class="check-body">
+              <div class="check-label">SSL Certificate</div>
+
+              {% if result.technical_checks.ssl.status == 'valid' %}
+                <div class="check-value">Valid · HTTPS secured</div>
+                <div class="check-value" style="margin-top:3px; font-size:0.72rem; opacity:0.7;">
+                  Issued: {{ result.technical_checks.ssl.issuer }}
+                </div>
+                <div class="check-value" style="margin-top:3px; font-size:0.72rem; opacity:0.7;">
+                  Expires: {{ result.technical_checks.ssl.expires_at }}
+                  {% if result.technical_checks.ssl.days_left is not none %}
+                    ({{ result.technical_checks.ssl.days_left }} days left)
+                  {% endif %}
+                </div>
+              {% elif result.url_display.startswith('https') %}
+                <div class="check-value">HTTPS used, but certificate details unavailable</div>
+              {% else %}
+                <div class="check-value">No HTTPS / SSL absent</div>
+              {% endif %}
+            </div>
+            <div class="check-badge">
+              {% if result.technical_checks.ssl.status == 'valid' %}VALID
+              {% elif result.url_display.startswith('https') %}WARN
+              {% else %}NONE{% endif %}
+            </div>
+          </div>
+          
+        </div>
+      </div>  
+
+      <!-- ── PAGE CONTENT ANALYSIS (table layout) ── -->
+      {% if result.page_scan %}
+      <div class="divider"></div>
+      <div class="section">
+        <div class="section-title">Page content analysis</div>
+        <div class="page-analysis-table">
+
+          <!-- Login form -->
+          <div class="pa-row">
+            <span class="pa-icon">🔑</span>
+            <span class="pa-label">Login form</span>
+            <span class="pa-value
+              {% if not result.page_scan.page_fetched %}neutral
+              {% elif result.page_scan.login_form %}bad{% else %}ok{% endif %}">
+              {% if not result.page_scan.page_fetched %}Unreachable
+              {% elif result.page_scan.login_form %}Password field detected
+              {% else %}No login form found{% endif %}
+            </span>
+          </div>
+
+          <!-- Form handler -->
+          <div class="pa-row">
+            <span class="pa-icon">📤</span>
+            <span class="pa-label">Form handler (SFH)</span>
+            <span class="pa-value
+              {% if not result.page_scan.page_fetched %}neutral
+              {% elif result.page_scan.sfh %}bad{% else %}ok{% endif %}">
+              {% if not result.page_scan.page_fetched %}N/A
+              {% elif result.page_scan.sfh %}Submits to external domain
+              {% else %}Form action is safe{% endif %}
+            </span>
+          </div>
+
+          <!-- Page title -->
+          <div class="pa-row">
+            <span class="pa-icon">🏷️</span>
+            <span class="pa-label">Page title</span>
+            <span class="pa-value
+              {% if result.page_scan.page_title %}ok
+              {% elif result.page_scan.page_fetched %}bad{% else %}neutral{% endif %}">
+              {% if result.page_scan.page_title %}
+                {{ result.page_scan.page_title[:35] }}{% if result.page_scan.page_title|length > 35 %}…{% endif %}
+              {% elif result.page_scan.page_fetched %}Empty (suspicious)
+              {% else %}N/A{% endif %}
+            </span>
+          </div>
+
+          <!-- Suspicious keywords -->
+          <div class="pa-row">
+            <span class="pa-icon">⚠️</span>
+            <span class="pa-label">Suspicious keywords</span>
+            <span class="pa-value
+              {% if result.page_scan.keyword_hits %}bad
+              {% elif result.page_scan.page_fetched %}ok{% else %}neutral{% endif %}">
+              {% if result.page_scan.keyword_hits %}{{ result.page_scan.keyword_hits|length }} phrase(s) found
+              {% elif result.page_scan.page_fetched %}None detected
+              {% else %}N/A{% endif %}
+            </span>
+          </div>
+
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Cache note -->
+      {% if result.from_cache %}
+      <div class="cache-note">Result served from cache — analysed recently.</div>
+      {% endif %}
+
+    </div>
+    {% endif %}
+
+    <!-- ── HOW IT WORKS ── -->
+    {% if not result or result.error %}
+    <div class="how-section">
+      <div class="how-title">How it works</div>
+      <div class="how-grid">
+        <div class="how-card">
+          <div class="how-num">01</div>
+          <h3>Feature extraction</h3>
+          <p>87 URL signals are extracted — length, dots, hyphens, WHOIS age, DNS records, and more.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-num">02</div>
+          <h3>ML prediction</h3>
+          <p>A tuned XGBoost model trained on 11,430 URLs produces a phishing probability score.</p>
+        </div>
+        <div class="how-card">
+          <div class="how-num">03</div>
+          <h3>XAI explanation</h3>
+          <p>Each verdict comes with human-readable reasons so you understand exactly why.</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <footer class="footer">
+      PhishRadar · Final Year Project · Umu Habiba · 32146640
+    </footer>
+  </div>
+
+  <script>
+    // Show spinner while form is submitting
+    const form = document.getElementById('scan-form');
+    const btn  = document.getElementById('scan-btn');
+    form.addEventListener('submit', () => { btn.classList.add('loading'); });
+
+    // Animate score bar and score ring on load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Score bar
+      const fill = document.querySelector('.score-bar-fill');
+      if (fill) {
+        const target = (fill.dataset.score || '0') + '%';
+        fill.style.width = '0%';
+        requestAnimationFrame(() => {
+          setTimeout(() => { fill.style.width = target; }, 50);
+        });
+      }
+
+      // Score ring — animate from full offset (empty) to target offset
+      const ringFill = document.querySelector('.score-ring-fill');
+      if (ringFill) {
+        const targetOffset = parseFloat(ringFill.getAttribute('data-target-offset') || '163.4');
+        ringFill.style.strokeDashoffset = '163.4'; // start empty
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            ringFill.style.strokeDashoffset = targetOffset;
+          }, 80);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
