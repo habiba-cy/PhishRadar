@@ -4,8 +4,7 @@ PhishRadar is a cybersecurity project developed as part of my BSc (Hons) Cyberse
 
 Features
 
-Machine Learning Detection: Uses a trained
-XGBoost model to classify potentially phishing URLs.
+Machine Learning Detection: Uses a trained XGBoost model to classify potentially phishing URLs.
 
 URL Feature Analysis: Examines URL characteristics and relevant domain information.
 
